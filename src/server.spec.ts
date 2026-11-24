@@ -47,6 +47,15 @@ describe('system information API', () => {
     expect(response.status).toBe(404);
   });
 
+  it('should return HTTP 404 for /api/v1/sysinfo1/sysinfo', async () => {
+    expect.assertions(1);
+
+    const response = await fetch(`${baseUrl}/api/v1/sysinfo1/sysinfo`);
+    await response.text();
+
+    expect(response.status).toBe(404);
+  });
+
   it('should return HTTP 200 for sysinfo', async () => {
     expect.assertions(1);
 
