@@ -1,6 +1,6 @@
 # TD3 — Intégration et livraison continues de sysinfo-api
 
-Vérifications locales et état de GitHub relevés le 24 novembre 2026. Les six tests Jest passent et l’image multi-étapes démarre correctement dans WSL2. Les résultats de publication seront ajoutés après l’exécution de la chaîne sur GitHub Actions.
+Vérifications réalisées le 24 novembre 2026 sous Ubuntu WSL2 et sur GitHub Actions. Les six tests Jest passent dans les deux environnements et l’image multi-étapes démarre correctement dans WSL2.
 
 ## À quoi sert l’intégration continue ?
 
@@ -11,6 +11,8 @@ Sous Ubuntu WSL2, les trois commandes se sont terminées avec succès. Jest a ex
 ## Comment la livraison continue est-elle déclenchée ?
 
 Le workflow `CD` écoute l’événement `workflow_run` de type `completed` pour `CI` sur `main`. Le job de publication exige une conclusion `success` et un événement `push` provenant du même dépôt. Il récupère le commit testé via `github.event.workflow_run.head_sha`, ce qui garantit que le contexte de construction est celui validé par CI, y compris si la branche a avancé entre-temps. [Événement workflow_run](https://docs.github.com/en/actions/reference/workflows-and-actions/events-that-trigger-workflows#workflow_run)
+
+Sur le commit `afe55ca`, le fichier `.github/workflows/cd.yml` était présent sur `main` et son contenu correspondait à la copie locale validée par `actionlint`. L’API GitHub Actions indiquait toutefois l’état `deleted` pour son entrée. La tentative de réactivation avec `gh workflow enable` a renvoyé HTTP 403. Après le push de `b35e935`, l’entrée est redevenue `active`. Ce commit ajoute un contrôle qui compare `git rev-parse HEAD` au SHA transmis par CI avant la construction.
 
 ## Comment l’image est-elle construite et versionnée ?
 
@@ -29,15 +31,21 @@ Docker Hub utilise les secrets de dépôt `DOCKERHUB_USERNAME` et `DOCKERHUB_TOK
 
 ## Résultats et suivi
 
-| Vérification                                     | Résultat observé                                                              |
-| ------------------------------------------------ | ----------------------------------------------------------------------------- |
-| Installation et compilation sous Node.js 22.23.5 | `npm ci` et `npm run build` réussis                                           |
-| Tests locaux                                     | 2 suites et 6 tests réussis                                                   |
-| Validation statique de CI et CD                  | `actionlint` 1.7.12 réussi                                                    |
-| Construction locale de l’image multi-étapes      | `sysinfo-api:td3-local`, 90 960 169 octets, utilisateur `node`                |
-| Essai HTTP dans le conteneur                     | `/` → 404, `/api/v1/sysinfo1/sysinfo` → 404, `/api/v1/sysinfo` → 200          |
-| CI sur GitHub Actions                            | Aucun workflow CI ni aucune exécution sur `main` au moment de la vérification |
-| Secrets GitHub Actions                           | `DOCKERHUB_USERNAME` présent, `DOCKERHUB_TOKEN` absent                        |
-| CD et publication                                | Vérification en attente du push approuvé et de l’ajout du secret Docker Hub   |
+| Vérification                                     | Résultat observé                                                                   |
+| ------------------------------------------------ | ---------------------------------------------------------------------------------- |
+| Installation et compilation sous Node.js 22.23.5 | `npm ci` et `npm run build` réussis                                                |
+| Tests locaux                                     | 2 suites et 6 tests réussis                                                        |
+| Validation statique de CI et CD                  | `actionlint` 1.7.12 réussi                                                         |
+| Construction locale de l’image multi-étapes      | `sysinfo-api:td3-local`, 90 960 169 octets, utilisateur `node`                     |
+| Essai HTTP dans le conteneur                     | `/` → 404, `/api/v1/sysinfo1/sysinfo` → 404, `/api/v1/sysinfo` → 200               |
+| CI sur GitHub Actions                            | Installation, compilation et 6 tests réussis sur le commit `b35e935`               |
+| Secrets GitHub Actions                           | `DOCKERHUB_USERNAME` et `DOCKERHUB_TOKEN` présents                                 |
+| CD et publication                                | Exécution automatique réussie après CI, avec contrôle du commit et des quatre tags |
 
-Après le push, `gh run list --branch main` permet d’identifier les exécutions. `gh run watch <id> --exit-status` suit chaque exécution et rapporte son état final. Les quatre références sont ensuite contrôlées avec `docker buildx imagetools inspect`. Les liens vers les exécutions et les digests seront consignés après vérification.
+Les commandes `gh run list` et `gh run watch <id> --exit-status` ont confirmé la réussite de CI, puis celle de CD déclenchée par `workflow_run`. [Exécution CI nº 45420949693](https://github.com/nourmourtada10/sysinfo-api/actions/runs/45420949693) · [Exécution CD nº 45421051619](https://github.com/nourmourtada10/sysinfo-api/actions/runs/45421051619)
+
+Pour cette exécution, le SHA publié était `b35e935f9485cb9e5024c011f56f676930cc15c4`. Immédiatement après la publication, une vérification indépendante avec `docker buildx imagetools inspect` a retrouvé le même digest pour les deux tags (`latest` et le SHA complet) sur les deux registres.
+
+```text
+sha256:924e15c9cb9ca570d6072ebc54e1a6da53160298881071ee74a86d34caa5e727
+```
